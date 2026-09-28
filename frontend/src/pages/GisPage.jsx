@@ -1,22 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Map, Layers, ChevronRight, CheckSquare, Square, Info } from 'lucide-react';
+import { Map, Layers, ChevronRight, Info } from 'lucide-react';
 import GisMap from '../components/GisMap';
 import api from '../services/api';
 
 export default function GisPage() {
-  const [plot, setPlot] = useState(null);
+  const [plots, setPlots] = useState([]);
+  const [blocks, setBlocks] = useState([]);
+  const [selectedPlotId, setSelectedPlotId] = useState(1);
+  const [selectedPlot, setSelectedPlot] = useState(null);
+
+  const fetchStationData = async () => {
+    try {
+      const [plotsRes, blocksRes] = await Promise.all([
+        api.get('/plots'),
+        api.get('/gis/blocks')
+      ]);
+      setPlots(plotsRes.data);
+      setBlocks(blocksRes.data);
+      if (plotsRes.data.length > 0) {
+        setSelectedPlotId(plotsRes.data[0].id);
+        setSelectedPlot(plotsRes.data[0]);
+      }
+    } catch (err) {
+      console.error('Error fetching station data in GisPage:', err);
+    }
+  };
 
   useEffect(() => {
-    fetchPlotInfo();
+    fetchStationData();
   }, []);
 
-  const fetchPlotInfo = async () => {
-    try {
-      const res = await api.get('/plots/1');
-      setPlot(res.data);
-    } catch (err) {
-      console.error(err);
-    }
+  const handleSelectPlot = (pId) => {
+    setSelectedPlotId(pId);
+    const p = plots.find(item => item.id === pId);
+    if (p) setSelectedPlot(p);
   };
 
   return (
@@ -28,7 +45,7 @@ export default function GisPage() {
             <Map className="w-5 h-5 text-emerald-600" /> GIS Field Mapping & Spatial Boundary Module
           </h1>
           <p className="text-xs text-slate-500">
-            Interactive GIS polygon feature representation for plot E4A with vertex boundary editing & QGIS GeoJSON compatibility.
+            Paddy Breeding Station (PBS), TNAU, Coimbatore (11.0125°N, 76.9360°E) • Interactive GIS polygons, QGIS GeoJSON & RBD spatial layout.
           </p>
         </div>
       </div>
@@ -44,50 +61,83 @@ export default function GisPage() {
 
           <div className="space-y-2 text-xs">
             {/* Level 1: Station */}
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="font-bold text-emerald-950 flex items-center gap-1.5 p-1.5 bg-emerald-50 rounded border border-emerald-200">
-                <ChevronRight className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Central Paddy Station (CGIAR)</span>
+                <ChevronRight className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <div className="min-w-0">
+                  <span className="block truncate font-bold">Paddy Breeding Station (PBS-CBE)</span>
+                  <span className="block text-[10px] text-emerald-700 font-normal truncate">TNAU, Coimbatore, TN</span>
+                </div>
               </div>
 
-              {/* Level 2: Block */}
-              <div className="pl-4 space-y-1">
-                <div className="font-semibold text-slate-800 flex items-center gap-1.5 p-1 bg-slate-50 rounded">
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Block E (Experimental Field)</span>
-                </div>
+              {/* Level 2: Blocks & Plots */}
+              <div className="pl-2 space-y-2">
+                {blocks.map((bk) => {
+                  const blockPlots = plots.filter(p => p.block_id === bk.id);
+                  return (
+                    <div key={bk.id} className="space-y-1">
+                      <div className="font-semibold text-slate-800 text-[11px] flex items-center gap-1.5 p-1 bg-slate-100 rounded">
+                        <ChevronRight className="w-3 h-3 text-slate-500" />
+                        <span className="truncate">{bk.name}</span>
+                        <span className="text-[10px] ml-auto text-slate-500 font-mono">({blockPlots.length})</span>
+                      </div>
 
-                {/* Level 3: Plot E4A */}
-                <div className="pl-4">
-                  <div className="p-2 bg-emerald-600 text-white font-bold rounded-lg shadow-sm flex items-center justify-between">
-                    <span>Plot E4A</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-800 text-emerald-100 font-mono">
-                      {plot?.status || 'Planted'}
-                    </span>
-                  </div>
-                </div>
+                      {/* Level 3: Plots List */}
+                      <div className="pl-3 space-y-1">
+                        {blockPlots.map((p) => {
+                          const isSelected = p.id === selectedPlotId;
+                          return (
+                            <div
+                              key={p.id}
+                              onClick={() => handleSelectPlot(p.id)}
+                              className={`p-1.5 rounded-lg text-[11px] font-bold flex items-center justify-between cursor-pointer transition ${
+                                isSelected
+                                  ? 'bg-emerald-600 text-white shadow-sm'
+                                  : 'bg-slate-50 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              <span className="truncate">{p.plot_code} - {p.name}</span>
+                              <span className={`text-[9px] px-1 py-0.2 rounded font-mono ml-1 shrink-0 ${
+                                isSelected ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-200 text-slate-600'
+                              }`}>
+                                {p.status || 'Planned'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
 
           {/* Plot Quick Measurements Summary Card */}
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
-            <div className="font-bold text-slate-800 flex items-center gap-1">
-              <Info className="w-3.5 h-3.5 text-emerald-600" /> E4A Field Measurements
+          {selectedPlot && (
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+              <div className="font-bold text-slate-800 flex items-center gap-1">
+                <Info className="w-3.5 h-3.5 text-emerald-600" /> {selectedPlot.plot_code} Field Measurements
+              </div>
+              <div className="space-y-1 text-slate-600 font-mono text-[11px]">
+                <div>North: <b>{selectedPlot.north_length_m} m</b></div>
+                <div>South: <b>{selectedPlot.south_length_m} m</b></div>
+                <div>East: <b>{selectedPlot.east_length_m} m</b></div>
+                <div>West: <b>{selectedPlot.west_length_m} m</b></div>
+                <div>Area: <b>{selectedPlot.area_sqm || '-'} m²</b></div>
+                <div>Additional: <b>{selectedPlot.additional_measurement_value} {selectedPlot.additional_measurement_unit}</b></div>
+              </div>
             </div>
-            <div className="space-y-1 text-slate-600 font-mono text-[11px]">
-              <div>North: <b>{plot?.north_length_m} m</b></div>
-              <div>South: <b>{plot?.south_length_m} m</b></div>
-              <div>East: <b>{plot?.east_length_m} m</b></div>
-              <div>West: <b>{plot?.west_length_m} m</b></div>
-              <div>Additional: <b>{plot?.additional_measurement_value} {plot?.additional_measurement_unit}</b></div>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Right Panel: GisMap */}
         <div className="lg:col-span-3">
-          <GisMap plotId={1} showGridOverlay={true} />
+          <GisMap
+            plotId={selectedPlotId}
+            onSelectPlot={handleSelectPlot}
+            showGridOverlay={true}
+          />
         </div>
       </div>
     </div>

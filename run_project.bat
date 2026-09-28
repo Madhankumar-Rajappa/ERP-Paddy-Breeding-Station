@@ -12,13 +12,35 @@ echo.
 
 cd /d "%~dp0"
 
+python --version >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Python is not found in PATH. Please install Python 3.10+.
+    pause
+    exit /b 1
+)
+
+call npm --version >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Node.js / npm is not found in PATH. Please install Node.js.
+    pause
+    exit /b 1
+)
+
 echo  [2/4] Seeding Database with Plot E4A & Demo Varieties...
 cd backend
 python seed.py
 if %ERRORLEVEL% NEQ 0 (
-    echo [WARNING] Seed script encountered an notice or table already seeded.
+    echo [WARNING] Seed script encountered a notice or table already seeded.
 )
 cd ..
+
+if not exist "%~dp0frontend\dist" (
+    echo.
+    echo Building frontend production assets for preview...
+    cd "%~dp0frontend"
+    call npm run build
+    cd /d "%~dp0"
+)
 
 echo.
 echo  [3/4] Launching FastAPI Backend Server (Port 8000)...

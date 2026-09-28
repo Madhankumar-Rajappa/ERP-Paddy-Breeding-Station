@@ -1,27 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Sprout, TestTube2, Ruler, CalendarCheck2, Wheat, 
-  MapPin, Clock, ArrowRight, FileText, CheckCircle2, ChevronRight
+  Sprout, TestTube2, Ruler, Wheat, Clock, FileText, CheckCircle2, ChevronRight, Grid
 } from 'lucide-react';
-import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import api from '../services/api';
 import GisMap from '../components/GisMap';
 import PlotGridCanvas from '../components/PlotGridCanvas';
 
 export default function DashboardPage() {
+  const [plots, setPlots] = useState([]);
+  const [selectedPlotId, setSelectedPlotId] = useState(1);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('map');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (plotId) => {
+    setLoading(true);
     try {
-      const res = await api.get('/dashboard/plots/1'); // Plot 1 is E4A
+      const res = await api.get(`/dashboard/plots/${plotId}`);
       setData(res.data);
     } catch (err) {
       console.error('Error fetching dashboard summary:', err);
@@ -30,15 +28,38 @@ export default function DashboardPage() {
     }
   };
 
-  if (loading) {
+  useEffect(() => {
+    const fetchPlots = async () => {
+      try {
+        const res = await api.get('/plots');
+        setPlots(res.data);
+        if (res.data.length > 0) {
+          setSelectedPlotId(res.data[0].id);
+          fetchDashboardData(res.data[0].id);
+        }
+      } catch (err) {
+        console.error('Error fetching plots:', err);
+        fetchDashboardData(1);
+      }
+    };
+    fetchPlots();
+  }, []);
+
+  const handlePlotChange = (e) => {
+    const id = parseInt(e.target.value);
+    setSelectedPlotId(id);
+    fetchDashboardData(id);
+  };
+
+  if (loading && !data) {
     return (
       <div className="flex items-center justify-center h-64 text-xs text-slate-500">
-        Loading E4A Plot Dashboard...
+        Loading Plot Dashboard...
       </div>
     );
   }
 
-  const { plot, trial, layout, planting, harvest, varieties, timeline } = data || {};
+  const { plot, trial, layout, harvest, varieties, timeline } = data || {};
 
   // Color palette for Recharts
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#f43f5e'];
@@ -52,7 +73,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Top Banner Header */}
+      {/* Top Banner Header with Plot Switcher */}
       <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center relative overflow-hidden">
         <div className="space-y-1 z-10">
           <div className="flex items-center space-x-2">
@@ -62,25 +83,42 @@ export default function DashboardPage() {
             <span className="text-slate-400 text-xs">• Block E</span>
           </div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            Plot {plot?.plot_code || 'E4A'} Prototype Master Dashboard
+            Plot {plot?.plot_code || 'Plot'} Master Dashboard
           </h1>
           <p className="text-xs text-slate-300">
-            Handwritten Measurements: North: {plot?.north_length_m}m | East: {plot?.east_length_m}m | West: {plot?.west_length_m}m | South: {plot?.south_length_m}m
+            Field Dimensions: North: {plot?.north_length_m}m | East: {plot?.east_length_m}m | West: {plot?.west_length_m}m | South: {plot?.south_length_m}m
           </p>
         </div>
 
-        <div className="mt-4 md:mt-0 flex items-center space-x-2 z-10">
+        <div className="mt-4 md:mt-0 flex flex-wrap items-center gap-2 z-10">
+          {/* Plot Switcher Dropdown */}
+          <div className="flex items-center space-x-1.5 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-xs">
+            <Grid className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-slate-400 font-semibold">Plot:</span>
+            <select
+              value={selectedPlotId}
+              onChange={handlePlotChange}
+              className="bg-transparent font-bold text-white focus:outline-none cursor-pointer"
+            >
+              {plots.map(p => (
+                <option key={p.id} value={p.id} className="bg-slate-800 text-white">
+                  {p.plot_code} - {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={() => navigate('/designer')}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-lg transition flex items-center gap-1.5"
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-lg transition flex items-center gap-1.5 cursor-pointer"
           >
-            <Ruler className="w-4 h-4" /> Design Layout
+            <Ruler className="w-3.5 h-3.5" /> Design Layout
           </button>
           <button
             onClick={() => navigate('/reports')}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
           >
-            <FileText className="w-4 h-4" /> Export Report
+            <FileText className="w-3.5 h-3.5" /> Export Report
           </button>
         </div>
       </div>
@@ -94,7 +132,7 @@ export default function DashboardPage() {
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-xl font-extrabold text-slate-800">{plot?.status || 'Planted'}</span>
+            <span className="text-xl font-extrabold text-slate-800">{plot?.status || 'Planned'}</span>
             <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
               {plot?.geometry_source || 'Prototype'}
             </span>
@@ -162,7 +200,7 @@ export default function DashboardPage() {
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setActiveTab('map')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                   activeTab === 'map'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -172,7 +210,7 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={() => setActiveTab('grid')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                   activeTab === 'grid'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -184,14 +222,14 @@ export default function DashboardPage() {
             
             <button
               onClick={() => navigate(activeTab === 'map' ? '/gis' : '/designer')}
-              className="text-xs text-emerald-700 font-bold hover:underline flex items-center gap-1"
+              className="text-xs text-emerald-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
             >
               Open Full View <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {activeTab === 'map' ? (
-            <GisMap plotId={1} showGridOverlay={true} />
+            <GisMap plotId={selectedPlotId} showGridOverlay={true} />
           ) : (
             <PlotGridCanvas layoutData={layout?.grid_summary ? { summary: layout.grid_summary, rows_grid: [] } : null} />
           )}

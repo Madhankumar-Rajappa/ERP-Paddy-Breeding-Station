@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Sprout, ShieldCheck, UserCheck, KeyRound } from 'lucide-react';
+import { Sprout, UserCheck, KeyRound } from 'lucide-react';
 
 export default function LoginPage() {
   const { login, loading } = useAuth();

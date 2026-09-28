@@ -22,8 +22,8 @@ def generate_rbd_layout(
 ) -> Dict[str, Any]:
     """
     Dynamic Plot Design Engine:
-    1. Computes total estimated row capacities based on available width & row spacing.
-    2. Computes total estimated plant positions per row based on available length & plant spacing.
+    1. Computes total estimated row capacities based on available length (Y) & row spacing.
+    2. Computes total estimated plant positions per row based on available width (X) & plant spacing.
     3. Performs RBD randomization (Entries assigned to Replications).
     4. Generates grid coordinates & clips points inside the plot polygon boundary using Shapely.
     """
@@ -40,17 +40,23 @@ def generate_rbd_layout(
     plot_poly_local = Polygon(local_coords)
     
     # 2. Dimensions & Spacing math
-    row_spacing_m = row_spacing_cm / 100.0
-    plant_spacing_m = plant_spacing_cm / 100.0
+    # Compute bounding box of the polygon in local coordinates
+    min_x, min_y, max_x, max_y = plot_poly_local.bounds
+    poly_width = max(1.0, max_x - min_x)
+    poly_length = max(1.0, max_y - min_y)
+
+    row_spacing_m = max(0.05, row_spacing_cm / 100.0)
+    plant_spacing_m = max(0.05, plant_spacing_cm / 100.0)
     
-    avg_width_m = (south_m + north_m) / 2.0
-    avg_length_m = (west_m + east_m) / 2.0
+    avg_width_m = (south_m + north_m) / 2.0 if (south_m and north_m) else poly_width
+    avg_length_m = (west_m + east_m) / 2.0 if (west_m and east_m) else poly_length
     
-    usable_width_m = max(1.0, avg_width_m - (2 * border_buffer_m))
-    usable_length_m = max(1.0, avg_length_m - (2 * border_buffer_m))
+    usable_width_m = max(1.0, poly_width - (2 * border_buffer_m))
+    usable_length_m = max(1.0, poly_length - (2 * border_buffer_m))
     
-    max_possible_rows = int(usable_width_m / row_spacing_m)
-    max_possible_plants_per_row = int(usable_length_m / plant_spacing_m)
+    # Rows run across length (Y), each row spans the width (X)
+    max_possible_rows = int(usable_length_m / row_spacing_m)
+    max_possible_plants_per_row = int(usable_width_m / plant_spacing_m)
     
     actual_rows = min(num_rows, max_possible_rows) if num_rows > 0 else max_possible_rows
     
@@ -87,7 +93,7 @@ def generate_rbd_layout(
     
     for r_idx in range(actual_rows):
         row_num = r_idx + 1
-        y_pos = border_buffer_m + (r_idx * row_spacing_m)
+        y_pos = min_y + border_buffer_m + (r_idx * row_spacing_m)
         
         # Determine replication & entry for this row
         rep_index = min(r_idx // rows_per_rep, num_replications - 1)
@@ -100,7 +106,7 @@ def generate_rbd_layout(
         plant_positions = []
         for p_idx in range(max_possible_plants_per_row):
             pos_num = p_idx + 1
-            x_pos = border_buffer_m + (p_idx * plant_spacing_m)
+            x_pos = min_x + border_buffer_m + (p_idx * plant_spacing_m)
             
             # Shapely point-in-polygon clipping check
             pt_local = Point(x_pos, y_pos)

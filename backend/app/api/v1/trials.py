@@ -87,3 +87,13 @@ def create_trial(trial_in: TrialCreate, db: Session = Depends(get_db)):
     db.commit()
     
     return trial
+
+@router.delete("/{trial_id}")
+def delete_trial(trial_id: int, db: Session = Depends(get_db)):
+    trial = db.query(Trial).filter(Trial.id == trial_id).first()
+    if not trial:
+        raise HTTPException(status_code=404, detail="Trial not found")
+        
+    db.delete(trial)
+    db.commit()
+    return {"message": f"Trial '{trial.trial_code}' deleted successfully"}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Info, Layers } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Layers } from 'lucide-react';
 
 export default function PlotGridCanvas({ layoutData }) {
   const [zoomLevel, setZoomLevel] = useState(1);

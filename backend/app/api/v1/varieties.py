@@ -38,9 +38,22 @@ def get_variety(variety_id: int, db: Session = Depends(get_db)):
 
 @router.delete("/{variety_id}")
 def delete_variety(variety_id: int, db: Session = Depends(get_db)):
+    from app.models.models import TrialEntry, Observation, HarvestRecord
     variety = db.query(Variety).filter(Variety.id == variety_id).first()
     if not variety:
         raise HTTPException(status_code=404, detail="Variety not found")
+        
+    in_trials = db.query(TrialEntry).filter(TrialEntry.variety_id == variety_id).first()
+    in_obs = db.query(Observation).filter(Observation.entry_id == variety_id).first()
+    in_harvest = db.query(HarvestRecord).filter(HarvestRecord.entry_id == variety_id).first()
+    
+    if in_trials or in_obs or in_harvest:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot delete variety '{variety.variety_name}' because it is linked to active trials, observations, or harvest records."
+        )
+        
     db.delete(variety)
     db.commit()
     return {"message": "Variety deleted successfully"}
+

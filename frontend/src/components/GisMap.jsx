@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Polygon, Marker, Popup, LayersControl, LayerGroup, CircleMarker, useMap } from 'react-leaflet';
+import React, { useState, useEffect, useCallback } from 'react';
+import { MapContainer, TileLayer, Polygon, Marker, Popup, Tooltip, LayersControl, LayerGroup, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useNavigate } from 'react-router-dom';
-import { Edit3, Check, X, Download, Upload, ZoomIn, Layers, Info, Ruler, Search, Compass, Eye } from 'lucide-react';
+import { Edit3, Check, X, Download, Upload, Ruler, Search, MapPin } from 'lucide-react';
 import api from '../services/api';
 
 // Fix Leaflet default marker icon bug in React
@@ -18,7 +18,7 @@ function MapRecenter({ coords }) {
   const map = useMap();
   useEffect(() => {
     if (coords && coords.length > 0) {
-      map.fitBounds(coords, { padding: [50, 50] });
+      map.fitBounds(coords, { padding: [50, 50], maxZoom: 19 });
     }
   }, [coords, map]);
   return null;
@@ -30,6 +30,7 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
   const [e4aPlot, setE4aPlot] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editableCoords, setEditableCoords] = useState([]);
+  const [focusCoords, setFocusCoords] = useState(null);
   const [activeLayout, setActiveLayout] = useState(null);
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -39,24 +40,25 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
   const [searchQuery, setSearchQuery] = useState('');
   const [showMeasurementTool, setShowMeasurementTool] = useState(false);
 
-  // Default fallback center lat/lng for Paddy Station
-  const defaultCenter = [17.5000, 78.5000];
-
-  useEffect(() => {
-    fetchLayers();
-    fetchPlotDetail();
-  }, [plotId]);
+  // Default center lat/lng for Paddy Breeding Station (PBS), TNAU Coimbatore
+  const defaultCenter = [11.0125, 76.9360];
+  const [stationBounds, setStationBounds] = useState(null);
 
   const fetchLayers = async () => {
     try {
       const res = await api.get('/gis/layers');
       setLayersData(res.data);
+      const st = res.data?.features?.find(f => f.properties?.layer_type === 'station');
+      if (st?.geometry) {
+        const coords = getLeafletPolygonCoords(st.geometry);
+        if (coords.length > 0) setStationBounds(coords);
+      }
     } catch (err) {
       console.error('Error fetching GIS layers:', err);
     }
   };
 
-  const fetchPlotDetail = async () => {
+  const fetchPlotDetail = useCallback(async () => {
     try {
       const res = await api.get(`/plots/${plotId}`);
       setE4aPlot(res.data);
@@ -65,6 +67,7 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
         // Leaflet expects [lat, lng] arrays
         const leafletCoords = geo.coordinates[0].map(c => [c[1], c[0]]);
         setEditableCoords(leafletCoords);
+        setFocusCoords(leafletCoords);
       }
       
       // Fetch latest layout for grid overlay
@@ -76,7 +79,15 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
     } catch (err) {
       console.error('Error fetching plot detail:', err);
     }
-  };
+  }, [plotId]);
+
+  useEffect(() => {
+    fetchLayers();
+  }, []);
+
+  useEffect(() => {
+    fetchPlotDetail();
+  }, [fetchPlotDetail]);
 
   // Convert GeoJSON coordinates for Leaflet
   const getLeafletPolygonCoords = (geojsonStr) => {
@@ -162,35 +173,68 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim().toUpperCase() === 'E4A' || searchQuery.trim().toUpperCase() === 'PLOT E4A') {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return;
+    const foundPlot = layersData?.features?.find(f => 
+      f.properties?.layer_type === 'plot' && 
+      (f.properties?.plot_code?.toLowerCase().includes(query) || f.properties?.name?.toLowerCase().includes(query))
+    );
+    if (foundPlot) {
       setDrawerOpen(true);
-      setMessage('Found Plot E4A on GIS map!');
+      setMessage(`Found Plot ${foundPlot.properties.plot_code} on GIS map!`);
+      if (onSelectPlot && foundPlot.properties.id) {
+        onSelectPlot(foundPlot.properties.id);
+      }
     } else {
-      setMessage(`Plot "${searchQuery}" not found in current view.`);
+      setMessage(`Plot "${searchQuery}" not found in current GIS layer.`);
     }
   };
 
   return (
     <div className="relative w-full h-[620px] rounded-xl overflow-hidden shadow-xl border border-slate-200">
-      {/* Top Map Toolbar */}
+      {/* Top Map Toolbar Container */}
       <div className="absolute top-3 left-3 right-3 z-[400] flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        {/* Search Bar */}
-        <form onSubmit={handleSearch} className="pointer-events-auto flex items-center bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg shadow-md border border-slate-200 text-xs">
-          <Search className="w-3.5 h-3.5 text-slate-400 mr-2" />
-          <input
-            type="text"
-            placeholder="Search GIS plot (e.g. E4A)..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-44 bg-transparent text-slate-800 focus:outline-none"
-          />
-          <button type="submit" className="px-2 py-0.5 bg-emerald-600 text-white rounded font-bold text-[10px]">
-            Search
-          </button>
-        </form>
+        {/* Station Location Info Badge & Search Bar */}
+        <div className="flex items-center gap-2 pointer-events-auto">
+          <div className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-950/90 text-white backdrop-blur-md rounded-lg shadow-md border border-emerald-700 text-xs font-bold">
+            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+            <span>PBS, TNAU Coimbatore • 11.0125°N, 76.9360°E</span>
+          </div>
+
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="flex items-center bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg shadow-md border border-slate-200 text-xs">
+            <Search className="w-3.5 h-3.5 text-slate-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search GIS plot (e.g. E4A)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-44 bg-transparent text-slate-800 focus:outline-none"
+            />
+            <button type="submit" className="px-2 py-0.5 bg-emerald-600 text-white rounded font-bold text-[10px]">
+              Search
+            </button>
+          </form>
+        </div>
 
         {/* GIS Tool Actions */}
         <div className="pointer-events-auto flex items-center space-x-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-lg shadow-md border border-slate-200 text-xs">
+          <button
+            onClick={() => {
+              if (stationBounds && stationBounds.length > 0) {
+                setFocusCoords(stationBounds);
+                setMessage('Zoomed to full Paddy Breeding Station (PBS), TNAU Coimbatore');
+              } else {
+                setMessage('Station boundary loading...');
+              }
+            }}
+            className="flex items-center space-x-1 px-2.5 py-1 bg-emerald-800 text-emerald-100 rounded font-bold hover:bg-emerald-900 transition shadow-sm"
+            title="Recenter to entire TNAU Station"
+          >
+            <MapPin className="w-3.5 h-3.5 text-emerald-300" />
+            <span>Station Overview</span>
+          </button>
+
           {!editMode ? (
             <button
               onClick={() => setEditMode(true)}
@@ -322,57 +366,114 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
             </LayerGroup>
           </LayersControl.Overlay>
 
-          {/* Plot E4A Polygon Feature */}
-          <LayersControl.Overlay checked name="Plot E4A Boundary">
+          {/* Station Plots & Fields Layer */}
+          <LayersControl.Overlay checked name="Station Plots & Fields">
             <LayerGroup>
-              {plotPolygonCoords.length > 0 && (
-                <Polygon
-                  positions={plotPolygonCoords}
-                  pathOptions={{
-                    color: editMode ? '#ef4444' : '#10b981',
-                    weight: 3.5,
-                    fillColor: '#34d399',
-                    fillOpacity: 0.35,
-                  }}
-                  eventHandlers={{
-                    click: () => setDrawerOpen(true)
-                  }}
-                >
-                  <Popup>
-                    <div className="p-1 space-y-2 text-xs">
-                      <div className="flex items-center justify-between border-b pb-1">
-                        <span className="font-bold text-sm text-emerald-900">Plot {e4aPlot?.plot_code || 'E4A'}</span>
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                          {e4aPlot?.status || 'Planted'}
-                        </span>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-600">
-                        <div>North: <b className="text-slate-800">{e4aPlot?.north_length_m} m</b></div>
-                        <div>South: <b className="text-slate-800">{e4aPlot?.south_length_m} m</b></div>
-                        <div>East: <b className="text-slate-800">{e4aPlot?.east_length_m} m</b></div>
-                        <div>West: <b className="text-slate-800">{e4aPlot?.west_length_m} m</b></div>
-                      </div>
+              {layersData?.features
+                ?.filter(f => f.properties.layer_type === 'plot')
+                .map((pt) => {
+                  const isSelected = pt.properties.id === plotId;
+                  const positions = (isSelected && editMode && editableCoords.length > 0)
+                    ? editableCoords
+                    : getLeafletPolygonCoords(pt.geometry);
 
-                      <div className="bg-slate-50 p-1.5 rounded border border-slate-200">
-                        <span className="text-[10px] text-slate-500 block">Additional Field Note:</span>
-                        <span className="font-semibold text-slate-700">
-                          {e4aPlot?.additional_measurement_value} {e4aPlot?.additional_measurement_unit}
-                        </span>
-                      </div>
+                  if (!positions || positions.length === 0) return null;
 
-                      <div className="pt-1 flex gap-1">
-                        <button
-                          onClick={() => setDrawerOpen(true)}
-                          className="w-full py-1 bg-emerald-600 text-white font-bold rounded text-[11px]"
-                        >
-                          Open GIS Drawer & ERP Records
-                        </button>
-                      </div>
-                    </div>
-                  </Popup>
-                </Polygon>
-              )}
+                  let strokeColor = '#3b82f6';
+                  let fillColor = '#93c5fd';
+                  if (isSelected) {
+                    strokeColor = editMode ? '#ef4444' : '#10b981';
+                    fillColor = '#34d399';
+                  } else if (pt.properties.status === 'Planted') {
+                    strokeColor = '#059669';
+                    fillColor = '#6ee7b7';
+                  } else if (pt.properties.status === 'Growing') {
+                    strokeColor = '#16a34a';
+                    fillColor = '#86efac';
+                  } else if (pt.properties.status === 'Prepared') {
+                    strokeColor = '#d97706';
+                    fillColor = '#fde68a';
+                  } else if (pt.properties.status === 'Harvested') {
+                    strokeColor = '#475569';
+                    fillColor = '#cbd5e1';
+                  }
+
+                  return (
+                    <Polygon
+                      key={`plot-${pt.properties.id}`}
+                      positions={positions}
+                      pathOptions={{
+                        color: strokeColor,
+                        weight: isSelected ? 3.5 : 2,
+                        fillColor: fillColor,
+                        fillOpacity: isSelected ? 0.45 : 0.22,
+                        dashArray: isSelected ? undefined : '4, 4'
+                      }}
+                      eventHandlers={{
+                        click: () => {
+                          if (onSelectPlot) onSelectPlot(pt.properties.id);
+                          setDrawerOpen(true);
+                          const c = getLeafletPolygonCoords(pt.geometry);
+                          if (c.length > 0) setFocusCoords(c);
+                        }
+                      }}
+                    >
+                      <Tooltip permanent={false} direction="center">
+                        <span className="font-bold text-xs">{pt.properties.plot_code}</span>
+                      </Tooltip>
+                      <Popup>
+                        <div className="p-1 space-y-2 text-xs">
+                          <div className="flex items-center justify-between border-b pb-1">
+                            <span className="font-bold text-sm text-emerald-900">{pt.properties.plot_code} - {pt.properties.name}</span>
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                              {pt.properties.status || 'Planned'}
+                            </span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-600 font-mono">
+                            <div>North: <b>{pt.properties.north_length_m} m</b></div>
+                            <div>South: <b>{pt.properties.south_length_m} m</b></div>
+                            <div>East: <b>{pt.properties.east_length_m} m</b></div>
+                            <div>West: <b>{pt.properties.west_length_m} m</b></div>
+                            <div>Area: <b>{pt.properties.area_sqm || '-'} m²</b></div>
+                            <div>Perimeter: <b>{pt.properties.perimeter_m || '-'} m</b></div>
+                          </div>
+
+                          {pt.properties.additional_measurement_value && (
+                            <div className="bg-slate-50 p-1.5 rounded border border-slate-200">
+                              <span className="text-[10px] text-slate-500 block">Field Note:</span>
+                              <span className="font-semibold text-slate-700">
+                                {pt.properties.additional_measurement_value} {pt.properties.additional_measurement_unit}
+                              </span>
+                            </div>
+                          )}
+
+                          {pt.properties.current_trial && (
+                            <div className="bg-emerald-50 p-1.5 rounded border border-emerald-200">
+                              <span className="text-[10px] text-emerald-700 font-bold block">Active Trial:</span>
+                              <span className="text-slate-800 font-semibold">{pt.properties.current_trial.name}</span>
+                              <span className="block text-[10px] text-slate-500 font-mono">Design: {pt.properties.current_trial.design} | {pt.properties.current_trial.crop}</span>
+                            </div>
+                          )}
+
+                          <div className="pt-1 flex gap-1">
+                            <button
+                              onClick={() => {
+                                if (onSelectPlot) onSelectPlot(pt.properties.id);
+                                setDrawerOpen(true);
+                                const c = getLeafletPolygonCoords(pt.geometry);
+                                if (c.length > 0) setFocusCoords(c);
+                              }}
+                              className="w-full py-1 bg-emerald-600 text-white font-bold rounded text-[11px] hover:bg-emerald-700 transition"
+                            >
+                              Select Field & Open Drawer
+                            </button>
+                          </div>
+                        </div>
+                      </Popup>
+                    </Polygon>
+                  );
+                })}
 
               {/* Draggable Vertex Markers in Edit Mode */}
               {editMode && editableCoords.map((coord, idx) => (
@@ -415,7 +516,7 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
           )}
         </LayersControl>
 
-        {plotPolygonCoords.length > 0 && <MapRecenter coords={plotPolygonCoords} />}
+        {(focusCoords || plotPolygonCoords).length > 0 && <MapRecenter coords={focusCoords || plotPolygonCoords} />}
       </MapContainer>
 
       {/* Selected Unit Popup Overlay */}
@@ -436,13 +537,13 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
         </div>
       )}
 
-      {/* Interactive E4A GIS Side Drawer */}
+      {/* Interactive Plot GIS Side Drawer */}
       {drawerOpen && (
         <div className="absolute top-0 right-0 bottom-0 w-80 bg-white/95 backdrop-blur-xl border-l border-slate-200 shadow-2xl z-[500] p-5 space-y-4 text-xs overflow-y-auto animate-slide-in">
           <div className="flex items-center justify-between border-b pb-3">
             <div className="flex items-center space-x-2">
               <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
-              <h3 className="font-extrabold text-slate-900 text-base">Plot E4A GIS Drawer</h3>
+              <h3 className="font-extrabold text-slate-900 text-base">{e4aPlot?.plot_code || 'Field'} GIS Drawer</h3>
             </div>
             <button onClick={() => setDrawerOpen(false)} className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100">
               <X className="w-4 h-4" />

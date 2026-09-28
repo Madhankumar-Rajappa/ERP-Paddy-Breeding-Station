@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.db.session import get_db
-from app.models.models import Plot, PlotGeometryVersion, PlotStatusHistory, AuditLog
+from app.models.models import Plot, PlotGeometryVersion, PlotStatusHistory, AuditLog, Trial, Block
 from app.schemas.schemas import PlotCreate, PlotUpdate, PlotOut, GeometryUpdate
 from app.services.gis_service import generate_prototype_polygon, calculate_area_and_perimeter
 
@@ -152,3 +152,20 @@ def get_plot_history(plot_id: int, db: Session = Depends(get_db)):
             } for g in geo_versions
         ]
     }
+
+@router.delete("/{plot_id}")
+def delete_plot(plot_id: int, db: Session = Depends(get_db)):
+    plot = db.query(Plot).filter(Plot.id == plot_id).first()
+    if not plot:
+        raise HTTPException(status_code=404, detail="Plot not found")
+        
+    active_trials = db.query(Trial).filter(Trial.plot_id == plot_id).count()
+    if active_trials > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete plot '{plot.plot_code}' because it has {active_trials} active trial(s) associated with it."
+        )
+        
+    db.delete(plot)
+    db.commit()
+    return {"message": f"Plot '{plot.plot_code}' deleted successfully"}

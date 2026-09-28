@@ -1,22 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Shield } from 'lucide-react';
+import { Users } from 'lucide-react';
 import api from '../services/api';
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
+    async function fetchUsers() {
+      try {
+        const res = await api.get('/users');
+        setUsers(res.data);
+      } catch (err) {
+        console.error('Error fetching users:', err);
+      }
+    }
     fetchUsers();
   }, []);
-
-  const fetchUsers = async () => {
-    try {
-      const res = await api.get('/users');
-      setUsers(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   return (
     <div className="space-y-6">

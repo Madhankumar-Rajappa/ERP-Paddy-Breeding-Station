@@ -19,9 +19,9 @@ export default function Header({ activePlotCode = 'E4A' }) {
         </div>
         <div className="hidden md:flex items-center space-x-2 text-xs text-slate-500 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
           <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-          <span className="font-medium text-emerald-900">Paddy Station Zone A</span>
+          <span className="font-medium text-emerald-900">Paddy Station</span>
           <span className="text-emerald-400">•</span>
-          <span className="font-bold text-emerald-700">Plot E4A Selected</span>
+          <span className="font-bold text-emerald-700">Plot {activePlotCode}</span>
         </div>
       </div>
 
@@ -35,7 +35,19 @@ export default function Header({ activePlotCode = 'E4A' }) {
           </div>
         </div>
 
-        <button className="relative p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100">
+        {user && (
+          <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200 text-xs">
+            <div className="w-7 h-7 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs uppercase">
+              {user.username ? user.username.charAt(0) : 'U'}
+            </div>
+            <div>
+              <p className="font-medium text-slate-800 leading-none">{user.full_name || user.username}</p>
+              <p className="text-[10px] text-slate-400 capitalize">{user.role}</p>
+            </div>
+          </div>
+        )}
+
+        <button className="relative p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100" title="Notifications">
           <Bell className="w-4 h-4" />
           <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500"></span>
         </button>

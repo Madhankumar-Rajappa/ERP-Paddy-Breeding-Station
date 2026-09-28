@@ -85,6 +85,19 @@ def get_gis_layers(db: Session = Depends(get_db)):
         "features": features
     }
 
+@router.get("/blocks")
+def list_blocks(db: Session = Depends(get_db)):
+    blocks = db.query(Block).all()
+    return [
+        {
+            "id": b.id,
+            "station_id": b.station_id,
+            "block_code": b.block_code,
+            "name": b.name,
+            "description": b.description
+        } for b in blocks
+    ]
+
 @router.get("/plots/{plot_id}/geojson")
 def export_plot_geojson(plot_id: int, db: Session = Depends(get_db)):
     """Exports single plot polygon as a QGIS-compatible GeoJSON Feature."""

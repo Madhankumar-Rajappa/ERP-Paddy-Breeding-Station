@@ -3,9 +3,9 @@ import math
 from typing import Dict, Any, List, Tuple
 from shapely.geometry import Polygon, Point, mapping, shape
 
-# Station Reference Center Point (Simulated Paddy Station Coordinates)
-STATION_CENTER_LAT = 17.50000
-STATION_CENTER_LNG = 78.50000
+# Station Reference Center Point: Paddy Breeding Station (PBS), TNAU, Coimbatore, Tamil Nadu
+STATION_CENTER_LAT = 11.01250
+STATION_CENTER_LNG = 76.93600
 
 def meters_to_lat_lng(x_meters: float, y_meters: float, ref_lat: float = STATION_CENTER_LAT, ref_lng: float = STATION_CENTER_LNG) -> Tuple[float, float]:
     """Convert local Cartesian meters (x=East, y=North) to geographic Lat/Lng."""
@@ -25,21 +25,28 @@ def lat_lng_to_meters(lat: float, lng: float, ref_lat: float = STATION_CENTER_LA
     x_meters = (lng - ref_lng) / lng_deg_per_meter
     return (x_meters, y_meters)
 
-def generate_prototype_polygon(north_m: float = 36.0, east_m: float = 30.0, west_m: float = 31.2, south_m: float = 34.8) -> Dict[str, Any]:
+def generate_prototype_polygon(
+    north_m: float = 36.0,
+    east_m: float = 30.0,
+    west_m: float = 31.2,
+    south_m: float = 34.8,
+    origin_x: float = 0.0,
+    origin_y: float = 0.0
+) -> Dict[str, Any]:
     """
-    Generates a quadrilateral polygon from the 4 boundary lengths (N, E, W, S).
+    Generates a quadrilateral polygon from the 4 boundary lengths (N, E, W, S) and origin offset.
     Local meter coordinates:
-    SW: (0, 0)
-    SE: (south_m, 0)
-    NE: (north_m, east_m)
-    NW: (0, west_m)
+    SW: (origin_x, origin_y)
+    SE: (origin_x + south_m, origin_y)
+    NE: (origin_x + north_m, origin_y + east_m)
+    NW: (origin_x, origin_y + west_m)
     """
     local_coords = [
-        (0.0, 0.0),
-        (south_m, 0.0),
-        (north_m, east_m),
-        (0.0, west_m),
-        (0.0, 0.0)
+        (origin_x, origin_y),
+        (origin_x + south_m, origin_y),
+        (origin_x + north_m, origin_y + east_m),
+        (origin_x, origin_y + west_m),
+        (origin_x, origin_y)
     ]
     
     geo_coords = []

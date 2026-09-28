@@ -1,5 +1,6 @@
 import io
 import csv
+from datetime import datetime, timezone
 from typing import Dict, Any, List
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
@@ -16,9 +17,10 @@ def generate_pdf_report(title: str, plot_data: Dict[str, Any], trial_data: Dict[
     subtitle_style = ParagraphStyle('SubTitleStyle', parent=styles['Heading2'], fontSize=13, textColor=colors.HexColor('#2d6a4f'), spaceBefore=10, spaceAfter=6)
     body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#212529'), spaceAfter=4)
     
+    current_date = datetime.now().strftime("%Y-%m-%d %H:%M")
     # Header
     story.append(Paragraph("PADDY BREEDING STATION - EXPERIMENTAL REPORT", title_style))
-    story.append(Paragraph(f"Report: {title} | Generated Date: 2026-09-20", body_style))
+    story.append(Paragraph(f"Report: {title} | Generated Date: {current_date}", body_style))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#1b4332'), spaceAfter=12))
     
     # Plot Details Section

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, List, Any, Dict
 from datetime import datetime
 
@@ -13,15 +13,14 @@ class Token(BaseModel):
     user: Dict[str, Any]
 
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     username: str
     email: str
     full_name: str
     role: str
     is_active: bool
-    
-    class Config:
-        from_attributes = True
 
 # Plot & Geometry
 class PlotBase(BaseModel):
@@ -44,15 +43,20 @@ class PlotCreate(PlotBase):
 class PlotUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    block_id: Optional[int] = None
     north_length_m: Optional[float] = None
     east_length_m: Optional[float] = None
     west_length_m: Optional[float] = None
     south_length_m: Optional[float] = None
     additional_measurement_value: Optional[float] = None
+    additional_measurement_unit: Optional[str] = None
+    additional_measurement_description: Optional[str] = None
     geometry_geojson: Optional[str] = None
     status: Optional[str] = None
 
 class PlotOut(PlotBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     block_id: Optional[int] = None
     crs: str
@@ -61,9 +65,6 @@ class PlotOut(PlotBase):
     geometry_source: str
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 class GeometryUpdate(BaseModel):
     geometry_geojson: str
@@ -78,11 +79,10 @@ class VarietyCreate(BaseModel):
     source: Optional[str] = "Paddy Breeding Station"
 
 class VarietyOut(VarietyCreate):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 # Trial
 class TrialCreate(BaseModel):
@@ -101,6 +101,8 @@ class TrialCreate(BaseModel):
     notes: Optional[str] = None
 
 class TrialOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     trial_code: str
     name: str
@@ -116,9 +118,6 @@ class TrialOut(BaseModel):
     status: str
     notes: Optional[str] = None
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 # Layout Engine
 class LayoutGenerateRequest(BaseModel):
@@ -135,6 +134,8 @@ class LayoutGenerateRequest(BaseModel):
     randomization_seed: Optional[int] = 42
 
 class LayoutOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     plot_id: int
     trial_id: int
@@ -151,9 +152,6 @@ class LayoutOut(BaseModel):
     status: str
     created_by: Optional[str] = None
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 # Planting
 class PlantingCreate(BaseModel):
@@ -165,12 +163,11 @@ class PlantingCreate(BaseModel):
     notes: Optional[str] = None
 
 class PlantingOut(PlantingCreate):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     updated_by: str
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 # Trait & Observations
 class TraitCreate(BaseModel):
@@ -183,10 +180,9 @@ class TraitCreate(BaseModel):
     description: Optional[str] = None
 
 class TraitOut(TraitCreate):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
-    
-    class Config:
-        from_attributes = True
 
 class ObservationCreate(BaseModel):
     trial_id: int
@@ -203,12 +199,11 @@ class ObservationCreate(BaseModel):
     remarks: Optional[str] = None
 
 class ObservationOut(ObservationCreate):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     recorded_by: str
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 # Harvest
 class HarvestCreate(BaseModel):
@@ -224,9 +219,8 @@ class HarvestCreate(BaseModel):
     notes: Optional[str] = None
 
 class HarvestOut(HarvestCreate):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     recorded_by: str
     created_at: datetime
-    
-    class Config:
-        from_attributes = True

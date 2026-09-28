@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sprout, Plus, Search, Trash2 } from 'lucide-react';
 import api from '../services/api';
 
@@ -14,37 +14,43 @@ export default function VarietyManagementPage() {
     source: 'CGIAR / National Paddy Station'
   });
 
-  useEffect(() => {
-    fetchVarieties();
-  }, [search]);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const fetchVarieties = async () => {
+  const fetchVarieties = useCallback(async () => {
     try {
       const res = await api.get(`/varieties?search=${search}`);
       setVarieties(res.data);
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [search]);
+
+  useEffect(() => {
+    fetchVarieties();
+  }, [fetchVarieties]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
     try {
       await api.post('/varieties', formData);
       setShowModal(false);
       fetchVarieties();
     } catch (err) {
       console.error(err);
+      setErrorMessage(err.response?.data?.detail || 'Failed to create variety.');
     }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete variety entry?')) return;
+    setErrorMessage('');
     try {
       await api.delete(`/varieties/${id}`);
       fetchVarieties();
     } catch (err) {
       console.error(err);
+      setErrorMessage(err.response?.data?.detail || 'Failed to delete variety.');
     }
   };
 
@@ -79,6 +85,12 @@ export default function VarietyManagementPage() {
           className="w-full pl-9 pr-4 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
         />
       </div>
+
+      {errorMessage && (
+        <div className="p-3 bg-red-100 border border-red-300 text-red-800 rounded-lg text-xs font-semibold">
+          {errorMessage}
+        </div>
+      )}
 
       {/* Variety Data Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -162,6 +174,17 @@ export default function VarietyManagementPage() {
                   type="text"
                   value={formData.source}
                   onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                  className="w-full p-2 border rounded-lg bg-slate-50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">Description / Special Traits</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows="2"
+                  placeholder="e.g. Submergence tolerance SUB1A QTL, semi-dwarf high tillering"
                   className="w-full p-2 border rounded-lg bg-slate-50"
                 />
               </div>

@@ -6,17 +6,16 @@ export default function AuditLogPage() {
   const [logs, setLogs] = useState([]);
 
   useEffect(() => {
+    async function fetchLogs() {
+      try {
+        const res = await api.get('/audit');
+        setLogs(res.data);
+      } catch (err) {
+        console.error('Error fetching audit logs:', err);
+      }
+    }
     fetchLogs();
   }, []);
-
-  const fetchLogs = async () => {
-    try {
-      const res = await api.get('/audit');
-      setLogs(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   return (
     <div className="space-y-6">
