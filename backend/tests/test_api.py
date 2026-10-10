@@ -38,6 +38,9 @@ def test_gis_layers():
     data = response.json()
     assert data["type"] == "FeatureCollection"
     assert len(data["features"]) >= 1
+    plot_features = [f for f in data["features"] if f.get("properties", {}).get("layer_type") == "plot"]
+    assert len(plot_features) == 1
+    assert plot_features[0]["properties"]["plot_code"] == "E4A"
 
 def test_variety_list():
     response = client.get("/api/v1/varieties")
@@ -97,3 +100,12 @@ def test_pdf_report():
     response = client.get("/api/v1/reports/pdf/1")
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
+
+def test_varieties_csv_export():
+    response = client.get("/api/v1/varieties/export/csv")
+    assert response.status_code == 200
+    assert "text/csv" in response.headers["content-type"]
+    content = response.text
+    assert "Variety Code" in content
+    assert "Maturity Classification" in content
+

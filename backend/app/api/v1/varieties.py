@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.db.session import get_db
 from app.models.models import Variety
 from app.schemas.schemas import VarietyCreate, VarietyOut
+from app.services.report_service import generate_csv_report
 
 router = APIRouter(prefix="/varieties", tags=["Variety Management"])
 
@@ -16,6 +17,46 @@ def list_varieties(search: Optional[str] = None, db: Session = Depends(get_db)):
             (Variety.variety_code.ilike(f"%{search}%"))
         )
     return query.all()
+
+@router.get("/export/csv")
+def export_varieties_csv(search: Optional[str] = None, db: Session = Depends(get_db)):
+    query = db.query(Variety)
+    if search:
+        query = query.filter(
+            (Variety.variety_name.ilike(f"%{search}%")) | 
+            (Variety.variety_code.ilike(f"%{search}%"))
+        )
+    varieties = query.all()
+    headers = [
+        "ID", "Variety Code", "Variety Name", "Duration (Days)", 
+        "Maturity Classification", "Breeding Source", "Description", "Created At"
+    ]
+    rows = []
+    for v in varieties:
+        days = v.duration_days or 120
+        if days < 115:
+            mat_class = "Short (<115 days)"
+        elif days <= 135:
+            mat_class = "Medium (115-135 days)"
+        else:
+            mat_class = "Long (>135 days)"
+            
+        rows.append([
+            v.id,
+            v.variety_code,
+            v.variety_name,
+            v.duration_days or "",
+            mat_class,
+            v.source or "",
+            v.description or "",
+            v.created_at.strftime("%Y-%m-%d %H:%M") if v.created_at else ""
+        ])
+    csv_str = generate_csv_report(headers, rows)
+    return Response(
+        content=csv_str,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=paddy_varieties_catalog.csv"}
+    )
 
 @router.post("", response_model=VarietyOut)
 def create_variety(variety_in: VarietyCreate, db: Session = Depends(get_db)):

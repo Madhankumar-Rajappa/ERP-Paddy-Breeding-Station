@@ -34,13 +34,11 @@ if %ERRORLEVEL% NEQ 0 (
 )
 cd ..
 
-if not exist "%~dp0frontend\dist" (
-    echo.
-    echo Building frontend production assets for preview...
-    cd "%~dp0frontend"
-    call npm run build
-    cd /d "%~dp0"
-)
+echo.
+echo Building frontend production assets for preview...
+cd "%~dp0frontend"
+call npm run build
+cd /d "%~dp0"
 
 echo.
 echo  [3/4] Launching FastAPI Backend Server (Port 8000)...

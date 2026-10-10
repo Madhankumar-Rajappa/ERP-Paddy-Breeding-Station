@@ -15,11 +15,13 @@ export default function GisPage() {
         api.get('/plots'),
         api.get('/gis/blocks')
       ]);
-      setPlots(plotsRes.data);
+      const e4aPlots = plotsRes.data.filter(p => p.plot_code?.toUpperCase() === 'E4A');
+      const filteredPlots = e4aPlots.length > 0 ? e4aPlots : plotsRes.data.slice(0, 1);
+      setPlots(filteredPlots);
       setBlocks(blocksRes.data);
-      if (plotsRes.data.length > 0) {
-        setSelectedPlotId(plotsRes.data[0].id);
-        setSelectedPlot(plotsRes.data[0]);
+      if (filteredPlots.length > 0) {
+        setSelectedPlotId(filteredPlots[0].id);
+        setSelectedPlot(filteredPlots[0]);
       }
     } catch (err) {
       console.error('Error fetching station data in GisPage:', err);
@@ -45,7 +47,7 @@ export default function GisPage() {
             <Map className="w-5 h-5 text-emerald-600" /> GIS Field Mapping & Spatial Boundary Module
           </h1>
           <p className="text-xs text-slate-500">
-            Paddy Breeding Station (PBS), TNAU, Coimbatore (11.0125°N, 76.9360°E) • Interactive GIS polygons, QGIS GeoJSON & RBD spatial layout.
+            TNAU Paddy Breeding Station, Unnamed Road, Vedapatti, Tamil Nadu 641039 (Plus Code: XWW8+4HP • 10.9953°N, 76.9165°E) • Interactive GIS polygons, QGIS GeoJSON & RBD spatial layout.
           </p>
         </div>
       </div>
@@ -65,15 +67,17 @@ export default function GisPage() {
               <div className="font-bold text-emerald-950 flex items-center gap-1.5 p-1.5 bg-emerald-50 rounded border border-emerald-200">
                 <ChevronRight className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <div className="min-w-0">
-                  <span className="block truncate font-bold">Paddy Breeding Station (PBS-CBE)</span>
-                  <span className="block text-[10px] text-emerald-700 font-normal truncate">TNAU, Coimbatore, TN</span>
+                  <span className="block truncate font-bold">TNAU Paddy Breeding Station</span>
+                  <span className="block text-[10px] text-emerald-700 font-normal truncate">XWW8+4HP, Vedapatti, TN 641039</span>
                 </div>
               </div>
 
               {/* Level 2: Blocks & Plots */}
               <div className="pl-2 space-y-2">
-                {blocks.map((bk) => {
-                  const blockPlots = plots.filter(p => p.block_id === bk.id);
+                {blocks
+                  .filter((bk) => plots.some((p) => p.block_id === bk.id))
+                  .map((bk) => {
+                    const blockPlots = plots.filter((p) => p.block_id === bk.id);
                   return (
                     <div key={bk.id} className="space-y-1">
                       <div className="font-semibold text-slate-800 text-[11px] flex items-center gap-1.5 p-1 bg-slate-100 rounded">

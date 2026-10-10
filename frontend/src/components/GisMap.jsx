@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, Tooltip, LayersControl, LayerGroup, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useNavigate } from 'react-router-dom';
-import { Edit3, Check, X, Download, Upload, Ruler, Search, MapPin } from 'lucide-react';
+import { Edit3, Check, X, Download, Upload, Ruler, Search, MapPin, FileText } from 'lucide-react';
 import api from '../services/api';
 
 // Fix Leaflet default marker icon bug in React
@@ -12,6 +12,17 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
 });
+
+// Convert GeoJSON coordinates for Leaflet
+export function getLeafletPolygonCoords(geojsonStr) {
+  if (!geojsonStr) return [];
+  try {
+    const geo = typeof geojsonStr === 'string' ? JSON.parse(geojsonStr) : geojsonStr;
+    return geo.coordinates[0].map(c => [c[1], c[0]]);
+  } catch {
+    return [];
+  }
+}
 
 // Helper component to center map on plot geometry
 function MapRecenter({ coords }) {
@@ -39,9 +50,10 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
   const [message, setMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showMeasurementTool, setShowMeasurementTool] = useState(false);
+  const [sketchModalOpen, setSketchModalOpen] = useState(false);
 
-  // Default center lat/lng for Paddy Breeding Station (PBS), TNAU Coimbatore
-  const defaultCenter = [11.0125, 76.9360];
+  // Default center lat/lng for TNAU Paddy Breeding Station (PBS), Vedapatti, Tamil Nadu 641039 (Plus Code: XWW8+4HP)
+  const defaultCenter = [10.99534, 76.91645];
   const [stationBounds, setStationBounds] = useState(null);
 
   const fetchLayers = async () => {
@@ -89,16 +101,6 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
     fetchPlotDetail();
   }, [fetchPlotDetail]);
 
-  // Convert GeoJSON coordinates for Leaflet
-  const getLeafletPolygonCoords = (geojsonStr) => {
-    if (!geojsonStr) return [];
-    try {
-      const geo = typeof geojsonStr === 'string' ? JSON.parse(geojsonStr) : geojsonStr;
-      return geo.coordinates[0].map(c => [c[1], c[0]]);
-    } catch {
-      return [];
-    }
-  };
 
   const plotPolygonCoords = editMode ? editableCoords : (e4aPlot ? getLeafletPolygonCoords(e4aPlot.geometry_geojson) : []);
 
@@ -177,6 +179,7 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
     if (!query) return;
     const foundPlot = layersData?.features?.find(f => 
       f.properties?.layer_type === 'plot' && 
+      (f.properties?.plot_code?.toUpperCase() === 'E4A' || f.properties?.code?.toUpperCase() === 'E4A') &&
       (f.properties?.plot_code?.toLowerCase().includes(query) || f.properties?.name?.toLowerCase().includes(query))
     );
     if (foundPlot) {
@@ -186,44 +189,44 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
         onSelectPlot(foundPlot.properties.id);
       }
     } else {
-      setMessage(`Plot "${searchQuery}" not found in current GIS layer.`);
+      setMessage(`Plot "${searchQuery}" not found on GIS map.`);
     }
   };
 
   return (
     <div className="relative w-full h-[620px] rounded-xl overflow-hidden shadow-xl border border-slate-200">
-      {/* Top Map Toolbar Container */}
-      <div className="absolute top-3 left-3 right-3 z-[400] flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        {/* Station Location Info Badge & Search Bar */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-950/90 text-white backdrop-blur-md rounded-lg shadow-md border border-emerald-700 text-xs font-bold">
-            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-            <span>PBS, TNAU Coimbatore • 11.0125°N, 76.9360°E</span>
+      {/* Top Map Toolbar Container - Leaves top-right corner clear for Leaflet LayersControl */}
+      <div className="absolute top-3 left-3 right-16 z-[400] flex flex-col items-start gap-2 pointer-events-none">
+        {/* Row 1: Station Location Info Badge & Search Bar */}
+        <div className="flex flex-wrap items-center gap-2 pointer-events-auto">
+          <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-950/90 text-white backdrop-blur-md rounded-lg shadow-md border border-emerald-700 text-xs font-bold max-w-fit">
+            <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="truncate max-w-[240px] sm:max-w-none">PBS • XWW8+4HP, Vedapatti (10.9953°N, 76.9165°E)</span>
           </div>
 
           {/* Search Bar */}
-          <form onSubmit={handleSearch} className="flex items-center bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-lg shadow-md border border-slate-200 text-xs">
-            <Search className="w-3.5 h-3.5 text-slate-400 mr-2" />
+          <form onSubmit={handleSearch} className="flex items-center bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-lg shadow-md border border-slate-200 text-xs">
+            <Search className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" />
             <input
               type="text"
               placeholder="Search GIS plot (e.g. E4A)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-44 bg-transparent text-slate-800 focus:outline-none"
+              className="w-36 sm:w-44 bg-transparent text-slate-800 focus:outline-none"
             />
-            <button type="submit" className="px-2 py-0.5 bg-emerald-600 text-white rounded font-bold text-[10px]">
+            <button type="submit" className="px-2 py-0.5 bg-emerald-600 text-white rounded font-bold text-[10px] hover:bg-emerald-700">
               Search
             </button>
           </form>
         </div>
 
-        {/* GIS Tool Actions */}
-        <div className="pointer-events-auto flex items-center space-x-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-lg shadow-md border border-slate-200 text-xs">
+        {/* Row 2: GIS Tool Actions */}
+        <div className="pointer-events-auto flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-lg shadow-md border border-slate-200 text-xs max-w-fit">
           <button
             onClick={() => {
               if (stationBounds && stationBounds.length > 0) {
                 setFocusCoords(stationBounds);
-                setMessage('Zoomed to full Paddy Breeding Station (PBS), TNAU Coimbatore');
+                setMessage('Zoomed to TNAU Paddy Breeding Station (XWW8+4HP, Vedapatti, TN)');
               } else {
                 setMessage('Station boundary loading...');
               }
@@ -232,7 +235,7 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
             title="Recenter to entire TNAU Station"
           >
             <MapPin className="w-3.5 h-3.5 text-emerald-300" />
-            <span>Station Overview</span>
+            <span>Overview</span>
           </button>
 
           {!editMode ? (
@@ -261,6 +264,15 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
               </button>
             </div>
           )}
+
+          <button
+            onClick={() => setSketchModalOpen(true)}
+            className="flex items-center space-x-1 px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded font-bold hover:bg-amber-100 transition shadow-sm"
+            title="View Original Handwritten Field Dimensions (E4a)"
+          >
+            <FileText className="w-3.5 h-3.5 text-amber-700" />
+            <span>Field Note</span>
+          </button>
 
           <button
             onClick={() => setShowMeasurementTool(!showMeasurementTool)}
@@ -293,7 +305,7 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
 
       {/* Measurement Tool Overlay Banner */}
       {showMeasurementTool && (
-        <div className="absolute top-16 left-3 z-[400] bg-slate-900/90 backdrop-blur-md text-white p-3 rounded-xl shadow-xl border border-slate-700 text-xs w-72 space-y-1">
+        <div className="absolute top-28 left-3 z-[400] bg-slate-900/90 backdrop-blur-md text-white p-3 rounded-xl shadow-xl border border-slate-700 text-xs w-72 space-y-1">
           <div className="font-bold text-amber-400 flex items-center justify-between border-b border-slate-700 pb-1">
             <span className="flex items-center gap-1.5"><Ruler className="w-4 h-4" /> GIS Spatial Measurement Tool</span>
             <button onClick={() => setShowMeasurementTool(false)} className="text-slate-400 hover:text-white">
@@ -301,10 +313,15 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
             </button>
           </div>
           <div className="grid grid-cols-2 gap-1 text-[11px] pt-1">
-            <div>GIS Calculated Area: <b className="text-emerald-400">{e4aPlot?.area_sqm || 1071} m²</b></div>
-            <div>Perimeter: <b className="text-emerald-400">{e4aPlot?.perimeter_m || 132} m</b></div>
-            <div>Handwritten North: <b className="text-amber-300">{e4aPlot?.north_length_m} m</b></div>
-            <div>Handwritten East: <b className="text-amber-300">{e4aPlot?.east_length_m} m</b></div>
+            <div>GIS Area: <b className="text-emerald-400">{e4aPlot?.area_sqm || 1083.6} m²</b></div>
+            <div>Perimeter: <b className="text-emerald-400">{e4aPlot?.perimeter_m || 132.0} m</b></div>
+            <div>Handwritten North: <b className="text-amber-300">{e4aPlot?.north_length_m || 36.0} m</b></div>
+            <div>Handwritten East: <b className="text-amber-300">{e4aPlot?.east_length_m || 30.0} m</b></div>
+            <div>Handwritten South: <b className="text-amber-300">{e4aPlot?.south_length_m || 34.8} m</b></div>
+            <div>Handwritten West: <b className="text-amber-300">{e4aPlot?.west_length_m || 31.2} m</b></div>
+            <div className="col-span-2 pt-1 border-t border-slate-700 text-[10px] text-slate-300">
+              Address: <b className="text-white">XWW8+4HP Vedapatti, TN 641039</b>
+            </div>
           </div>
         </div>
       )}
@@ -366,11 +383,11 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
             </LayerGroup>
           </LayersControl.Overlay>
 
-          {/* Station Plots & Fields Layer */}
-          <LayersControl.Overlay checked name="Station Plots & Fields">
+          {/* Benchmark Plot E4A Boundary Layer */}
+          <LayersControl.Overlay checked name="Plot E4a Boundary">
             <LayerGroup>
               {layersData?.features
-                ?.filter(f => f.properties.layer_type === 'plot')
+                ?.filter(f => f.properties.layer_type === 'plot' && (f.properties.plot_code?.toUpperCase() === 'E4A' || f.properties.code?.toUpperCase() === 'E4A'))
                 .map((pt) => {
                   const isSelected = pt.properties.id === plotId;
                   const positions = (isSelected && editMode && editableCoords.length > 0)
@@ -654,6 +671,59 @@ export default function GisMap({ plotId = 1, onSelectPlot, showGridOverlay = tru
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Field Note & Sketch Modal */}
+      {sketchModalOpen && (
+        <div className="fixed inset-0 z-[600] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-2xl w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-emerald-600" /> Plot E4a Handwritten Benchmark & Station Map
+              </h3>
+              <button onClick={() => setSketchModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-600 space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <div><b>Address:</b> XWW8+4HP TNAU Paddy Breeding Station, Unnamed Road,, Vedapatti, Tamil Nadu 641039</div>
+              <div><b>GIS Center:</b> 10.99534° N, 76.91645° E (Google Plus Code: <b>XWW8+4HP</b>)</div>
+              <div><b>E4a Dimensions:</b> North 36m | East 30m | West 31.2m | South 34.8m (Bund: 80cm) | Area: ~1,083 m² (0.27 ac)</div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-slate-700 block">1. E4a Field Note (Handwritten Dimensions)</span>
+                <div className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50 p-1">
+                  <img src="/e4a_dimensions.png" alt="E4a Plot Dimensions" className="w-full h-64 object-contain rounded" />
+                </div>
+                <div className="text-[10px] text-slate-500 font-mono text-center">
+                  North: 36m | East: 30m | West: 31.2m | South: 34.8m (80cm)
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-slate-700 block">2. Station Master Field Sheet</span>
+                <div className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50 p-1">
+                  <img src="/plots_master_map.jpeg" alt="Master Field Map" className="w-full h-64 object-contain rounded" />
+                </div>
+                <div className="text-[10px] text-slate-500 font-mono text-center">
+                  Plot E4a (0.29 ac) location inside Block E
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t">
+              <button
+                onClick={() => setSketchModalOpen(false)}
+                className="px-4 py-1.5 text-xs bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-900"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -29,8 +29,8 @@ def get_gis_layers(db: Session = Depends(get_db)):
                 "geometry": json.loads(st.boundary_geojson)
             })
             
-    # 2. Block Features
-    blocks = db.query(Block).all()
+    # 2. Block Features - Only return Block E associated with active GIS plot E4A
+    blocks = db.query(Block).filter(Block.block_code == "BLOCK-E").all()
     for bk in blocks:
         if bk.boundary_geojson:
             features.append({
@@ -44,8 +44,8 @@ def get_gis_layers(db: Session = Depends(get_db)):
                 "geometry": json.loads(bk.boundary_geojson)
             })
             
-    # 3. Plot Features
-    plots = db.query(Plot).all()
+    # 3. Plot Features - Only benchmark plot E4A for GIS map
+    plots = db.query(Plot).filter(Plot.plot_code.ilike("E4A")).all()
     for pt in plots:
         if pt.geometry_geojson:
             # Check active trial

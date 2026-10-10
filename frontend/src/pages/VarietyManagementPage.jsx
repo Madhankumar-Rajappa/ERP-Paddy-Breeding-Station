@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Sprout, Plus, Search, Trash2 } from 'lucide-react';
-import api from '../services/api';
+import { Sprout, Plus, Search, Trash2, Download } from 'lucide-react';
+import api, { API_BASE_URL } from '../services/api';
 
 export default function VarietyManagementPage() {
   const [varieties, setVarieties] = useState([]);
   const [search, setSearch] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     variety_code: '',
@@ -28,6 +29,28 @@ export default function VarietyManagementPage() {
   useEffect(() => {
     fetchVarieties();
   }, [fetchVarieties]);
+
+  const handleExportCSV = async () => {
+    setIsExporting(true);
+    try {
+      const url = `/varieties/export/csv${search ? `?search=${encodeURIComponent(search)}` : ''}`;
+      const res = await api.get(url, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', `paddy_varieties_catalog_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('API export failed, falling back to direct window open:', err);
+      window.open(`${API_BASE_URL}/varieties/export/csv${search ? `?search=${encodeURIComponent(search)}` : ''}`, '_blank');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -56,7 +79,7 @@ export default function VarietyManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <Sprout className="w-5 h-5 text-emerald-600" /> Paddy Variety Master Registry
@@ -66,24 +89,41 @@ export default function VarietyManagementPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-md transition flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" /> Add Variety
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleExportCSV}
+            disabled={isExporting}
+            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5 disabled:opacity-60"
+            title="Download germplasm catalog as CSV"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            {isExporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-md transition flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" /> Add Variety
+          </button>
+        </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative max-w-md">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-        <input
-          type="text"
-          placeholder="Search variety name or code..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
-        />
+      {/* Search Bar & Counter */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative max-w-md w-full">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search variety name or code..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+          />
+        </div>
+        <span className="text-xs text-slate-500 font-medium">
+          Showing <span className="font-bold text-slate-800">{varieties.length}</span> {varieties.length === 1 ? 'variety' : 'varieties'}
+        </span>
       </div>
 
       {errorMessage && (

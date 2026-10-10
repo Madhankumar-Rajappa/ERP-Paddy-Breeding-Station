@@ -75,23 +75,23 @@ def seed_database():
 
         # 2. Seed Station & Blocks
         station = db.query(Station).filter((Station.station_code == "PBS-CBE") | (Station.station_code == "PBS-HYD")).first()
-        st_geo_str = make_box_geojson(-135.0, -180.0, 105.0, 305.0)
+        st_geo_str = make_box_geojson(-50.0, -45.0, 50.0, 45.0)
         if not station:
             station = Station(
                 station_code="PBS-CBE",
-                name="Paddy Breeding Station (PBS), TNAU Coimbatore",
+                name="TNAU Paddy Breeding Station",
                 description="Historic Rice Research Station established in 1912, Centre for Plant Breeding and Genetics, Tamil Nadu Agricultural University",
                 boundary_geojson=st_geo_str,
-                location_name="TNAU Campus, Lawley Road, Coimbatore - 641003, Tamil Nadu"
+                location_name="XWW8+4HP TNAU Paddy Breeding Station, Unnamed Road,, Vedapatti, Tamil Nadu 641039"
             )
             db.add(station)
             db.commit()
             db.refresh(station)
         else:
             station.station_code = "PBS-CBE"
-            station.name = "Paddy Breeding Station (PBS), TNAU Coimbatore"
+            station.name = "TNAU Paddy Breeding Station"
             station.description = "Historic Rice Research Station established in 1912, Centre for Plant Breeding and Genetics, Tamil Nadu Agricultural University"
-            station.location_name = "TNAU Campus, Lawley Road, Coimbatore - 641003, Tamil Nadu"
+            station.location_name = "XWW8+4HP TNAU Paddy Breeding Station, Unnamed Road,, Vedapatti, Tamil Nadu 641039"
             station.boundary_geojson = st_geo_str
             db.commit()
             
@@ -100,7 +100,7 @@ def seed_database():
                 "code": "BLOCK-E",
                 "name": "Block E (East Experimental Block)",
                 "desc": "Dedicated block for yield evaluation and agronomic trials (Rows E1-E5, Cols a & b)",
-                "geo": make_box_geojson(5.0, -35.0, 100.0, 175.0)
+                "geo": make_box_geojson(-30.0, -25.0, 30.0, 25.0)
             },
             {
                 "code": "BLOCK-C",
@@ -268,6 +268,7 @@ def seed_database():
                 east_m=p_data["east"],
                 west_m=p_data["west"],
                 south_m=p_data["south"],
+                center_at_origin=(p_data["code"] == "E4A"),
                 origin_x=p_data["ox"],
                 origin_y=p_data["oy"]
             )
@@ -453,25 +454,24 @@ def seed_database():
         # 6. Seed Layout for E4A and Active Fields
         e4a_trial = trial_objs["TR-E4A-2026"]
         e4a_plot = plot_objs["E4A"]
+        layout_data = generate_rbd_layout(
+            plot_geometry_geojson=e4a_plot.geometry_geojson,
+            north_m=e4a_plot.north_length_m,
+            east_m=e4a_plot.east_length_m,
+            west_m=e4a_plot.west_length_m,
+            south_m=e4a_plot.south_length_m,
+            num_rows=15,
+            row_spacing_cm=20.0,
+            plant_spacing_cm=15.0,
+            border_buffer_m=0.5,
+            pathway_width_m=0.5,
+            num_entries=5,
+            num_replications=3,
+            varieties=[{"id": v.id, "variety_code": v.variety_code, "variety_name": v.variety_name} for v in variety_objs[:5]],
+            randomization_seed=42
+        )
         layout_e4a = db.query(Layout).filter(Layout.trial_id == e4a_trial.id).first()
         if not layout_e4a:
-            layout_data = generate_rbd_layout(
-                plot_geometry_geojson=e4a_plot.geometry_geojson,
-                north_m=e4a_plot.north_length_m,
-                east_m=e4a_plot.east_length_m,
-                west_m=e4a_plot.west_length_m,
-                south_m=e4a_plot.south_length_m,
-                num_rows=15,
-                row_spacing_cm=20.0,
-                plant_spacing_cm=15.0,
-                border_buffer_m=0.5,
-                pathway_width_m=0.5,
-                num_entries=5,
-                num_replications=3,
-                varieties=[{"id": v.id, "variety_code": v.variety_code, "variety_name": v.variety_name} for v in variety_objs[:5]],
-                randomization_seed=42
-            )
-            
             layout_e4a = Layout(
                 plot_id=e4a_plot.id,
                 trial_id=e4a_trial.id,
@@ -491,6 +491,9 @@ def seed_database():
             db.add(layout_e4a)
             db.commit()
             db.refresh(layout_e4a)
+        else:
+            layout_e4a.generated_grid_json = json.dumps(layout_data)
+            db.commit()
 
         # 7. Seed Planting Records for Active Trials
         planting_check = db.query(PlantingRecord).filter(PlantingRecord.trial_id == e4a_trial.id).first()

@@ -3,9 +3,10 @@ import math
 from typing import Dict, Any, List, Tuple
 from shapely.geometry import Polygon, Point, mapping, shape
 
-# Station Reference Center Point: Paddy Breeding Station (PBS), TNAU, Coimbatore, Tamil Nadu
-STATION_CENTER_LAT = 11.01250
-STATION_CENTER_LNG = 76.93600
+# Station Reference Center Point: TNAU Paddy Breeding Station (PBS)
+# Exact Address: XWW8+4HP TNAU Paddy Breeding Station, Unnamed Road,, Vedapatti, Tamil Nadu 641039
+STATION_CENTER_LAT = 10.99534
+STATION_CENTER_LNG = 76.91645
 
 def meters_to_lat_lng(x_meters: float, y_meters: float, ref_lat: float = STATION_CENTER_LAT, ref_lng: float = STATION_CENTER_LNG) -> Tuple[float, float]:
     """Convert local Cartesian meters (x=East, y=North) to geographic Lat/Lng."""
@@ -30,24 +31,35 @@ def generate_prototype_polygon(
     east_m: float = 30.0,
     west_m: float = 31.2,
     south_m: float = 34.8,
+    center_at_origin: bool = True,
     origin_x: float = 0.0,
     origin_y: float = 0.0
 ) -> Dict[str, Any]:
     """
-    Generates a quadrilateral polygon from the 4 boundary lengths (N, E, W, S) and origin offset.
-    Local meter coordinates:
-    SW: (origin_x, origin_y)
-    SE: (origin_x + south_m, origin_y)
-    NE: (origin_x + north_m, origin_y + east_m)
-    NW: (origin_x, origin_y + west_m)
+    Generates a quadrilateral polygon from the 4 boundary lengths (N, E, W, S).
+    When center_at_origin is True, the polygon is centered directly at (0, 0)
+    matching the exact reference coordinates.
     """
-    local_coords = [
-        (origin_x, origin_y),
-        (origin_x + south_m, origin_y),
-        (origin_x + north_m, origin_y + east_m),
-        (origin_x, origin_y + west_m),
-        (origin_x, origin_y)
-    ]
+    if center_at_origin:
+        half_s = south_m / 2.0
+        half_n = north_m / 2.0
+        half_w = west_m / 2.0
+        half_e = east_m / 2.0
+        local_coords = [
+            (-half_s, -half_w),
+            (half_s, -half_w),
+            (half_n, half_e),
+            (-half_n, half_w),
+            (-half_s, -half_w)
+        ]
+    else:
+        local_coords = [
+            (origin_x, origin_y),
+            (origin_x + south_m, origin_y),
+            (origin_x + north_m, origin_y + east_m),
+            (origin_x, origin_y + west_m),
+            (origin_x, origin_y)
+        ]
     
     geo_coords = []
     for x, y in local_coords:

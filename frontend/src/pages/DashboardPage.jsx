@@ -34,8 +34,10 @@ export default function DashboardPage() {
         const res = await api.get('/plots');
         setPlots(res.data);
         if (res.data.length > 0) {
-          setSelectedPlotId(res.data[0].id);
-          fetchDashboardData(res.data[0].id);
+          const e4a = res.data.find(p => p.plot_code?.toUpperCase() === 'E4A');
+          const defaultPlot = e4a || res.data[0];
+          setSelectedPlotId(defaultPlot.id);
+          fetchDashboardData(defaultPlot.id);
         }
       } catch (err) {
         console.error('Error fetching plots:', err);
